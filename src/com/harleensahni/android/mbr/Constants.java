@@ -29,11 +29,17 @@ public class Constants {
     public static final String TAG = "MediaButtonRouter";
     public static final String INTENT_ACTION_VIEW_MEDIA_BUTTON_LIST = "com.harleensahni.android.VIEW_MEDIA_LIST";
     public static final String INTENT_ACTION_VIEW_MEDIA_LIST_KEYPRESS = "com.harleensahni.android.VIEW_MEDIA_LIST_KEYPRESS";
+    public static final String INTENT_MEDIA_BUTTON_RECEIVER_SERVICE = "com.harleensahni.android.MEDIA_BUTTON_RECEIVER_SERVICE";
     public static final String ENABLED_PREF_KEY = "enable_receiver";
     public static final String INTRO_SHOWN_KEY = "intro_shown";
     public static final String TIMEOUT_KEY = "timeout";
     public static final String CONSERVATIVE_PREF_KEY = "conservative";
     public static final String CONFIRM_ACTION_PREF_KEY = "confirm_action";
+    public static final String ONE_BUTTON_MODE_PREF_KEY = "one_button_mode";
     public static final String HIDDEN_APPS_KEY = "hidden_apps";
     public static final String LAST_MEDIA_BUTTON_RECEIVER = "last_media_button_receiver";
+    public static final String CURRENT_AUDIO_PLAYER_NAME = "current_audio_player_name";
+    public static final String CURRENT_AUDIO_PLAYER_PACKAGE = "current_audio_player_pkg";
+    public static final String CURRENT_AUDIO_PLAYER_IS_ACTIVE = "current_audio_player_is_active";
+    public static final String SELECTION_ACTED_KEY = "btButtonSelectionActed";
 }

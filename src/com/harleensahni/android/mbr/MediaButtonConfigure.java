@@ -58,6 +58,11 @@ public class MediaButtonConfigure extends PreferenceActivity implements OnShared
         PreferenceCategory visibleAppsCategory = new PreferenceCategory(this);
         visibleAppsCategory.setTitle(R.string.visible_apps_header);
         getPreferenceScreen().addPreference(visibleAppsCategory);
+        
+        PreferenceCategory visibleVoiceAppsCategory = new PreferenceCategory(this);
+        visibleVoiceAppsCategory.setTitle(R.string.visible_voice_apps_header);
+        getPreferenceScreen().addPreference(visibleVoiceAppsCategory);
+        
         final List<CheckBoxPreference> showAppCheckBoxPreferences = new ArrayList<CheckBoxPreference>();
         OnPreferenceChangeListener showPreferenceChangeListener = new Preference.OnPreferenceChangeListener() {
 
@@ -91,9 +96,6 @@ public class MediaButtonConfigure extends PreferenceActivity implements OnShared
 
         List<ResolveInfo> mediaReceivers = Utils.getMediaReceivers(getPackageManager(), false, null);
         for (ResolveInfo mediaReceiver : mediaReceivers) {
-            if (MediaButtonReceiver.class.getName().equals(mediaReceiver.activityInfo.name)) {
-                continue;
-            }
             CheckBoxPreference showReceiverPreference = new CheckBoxPreference(this);
             showReceiverPreference.setTitle(Utils.getAppName(mediaReceiver, getPackageManager()));
             showReceiverPreference.setPersistent(false);
@@ -103,6 +105,19 @@ public class MediaButtonConfigure extends PreferenceActivity implements OnShared
             showReceiverPreference.setOnPreferenceChangeListener(showPreferenceChangeListener);
             visibleAppsCategory.addPreference(showReceiverPreference);
             showAppCheckBoxPreferences.add(showReceiverPreference);
+        }
+        
+        List<ResolveInfo> voiceCommandApps = Utils.getVoiceCommandApps(getPackageManager(), false, null);
+        for (ResolveInfo currVoiceCommandApp : voiceCommandApps) {
+            CheckBoxPreference showVoiceCommandAppPreference = new CheckBoxPreference(this);
+            showVoiceCommandAppPreference.setTitle(Utils.getAppName(currVoiceCommandApp, getPackageManager()));
+            showVoiceCommandAppPreference.setPersistent(false);
+            showVoiceCommandAppPreference.setKey(currVoiceCommandApp.activityInfo.applicationInfo.sourceDir
+                    + currVoiceCommandApp.activityInfo.name);
+            showVoiceCommandAppPreference.setChecked(!hiddenIds.contains(showVoiceCommandAppPreference.getKey()));
+            showVoiceCommandAppPreference.setOnPreferenceChangeListener(showPreferenceChangeListener);
+            visibleVoiceAppsCategory.addPreference(showVoiceCommandAppPreference);
+            showAppCheckBoxPreferences.add(showVoiceCommandAppPreference);
         }
 
         Eula.show(this);

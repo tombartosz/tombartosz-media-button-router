@@ -32,5 +32,8 @@
     <string name="tts_warning_summary">Install missing voice data for the text-to-speech engine. Required to speak music app selections.</string>
     <string name="pref_confirm_action_title">Confirm Selection</string>
     <string name="confirm_action_summary">When checked, confirm app by hitting play. Uncheck, will default to whatever is app is selected on timeout (one less button press).</string>
-	<string name="visible_apps_header">Apps To Show In The Selector</string>
+	<string name="pref_one_button_mode_title">One Button Mode</string>
+    <string name="one_button_mode_summary">Check this for Bluetooth devices with only one media button. A single click will move to the next app, and whichever app is selected on timeout will activate.</string>
+	<string name="visible_apps_header">Media Apps To Show In The Selector</string>
+	<string name="visible_voice_apps_header">Voice Command Apps To Show In The Selector</string>
 </resources>

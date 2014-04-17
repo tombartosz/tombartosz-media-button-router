@@ -35,14 +35,20 @@ public class MediaButtonRouterBootReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+    	
+    	SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        
         if (Utils.isHandlingThroughSoleReceiver()) {
-            SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
             if (preferences.getBoolean(Constants.ENABLED_PREF_KEY, true)) {
                 Log.d(Constants.TAG, "Starting media button monitor service through boot listener");
                 Intent serviceIntent = new Intent(context, MediaButtonMonitorService.class);
                 context.startService(serviceIntent);
             }
         }
+        preferences.edit().remove(Constants.CURRENT_AUDIO_PLAYER_NAME)
+        				  .remove(Constants.CURRENT_AUDIO_PLAYER_PACKAGE)
+        				  .commit();
+
     }
 
 }
