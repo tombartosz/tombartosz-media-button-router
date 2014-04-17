@@ -4,6 +4,9 @@
       android:versionName="1.5.1" xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.GET_TASKS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <uses-permission android:name = "android.permission.WAKE_LOCK"/>
+	<uses-permission android:name = "android.permission.READ_PHONE_STATE"/>
+	<uses-permission android:name = "android.permission.MODIFY_AUDIO_SETTINGS"/>
 
 
     <application android:icon="@drawable/icon" android:label="@string/app_name">
@@ -32,6 +35,10 @@
                 <action android:name="com.harleensahni.android.VIEW_MEDIA_LIST" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <intent-filter>
+				<action android:name="android.intent.action.VOICE_COMMAND"/>
+				<category android:name="android.intent.category.DEFAULT" />
+			</intent-filter>
         </activity>
 		<receiver android:name=".receivers.MediaButtonReceiver">
 			<!--  This priority is higher than is supposed to be used for user apps, 
@@ -52,6 +59,9 @@
 		</receiver>
 
 		<service android:name=".MediaButtonMonitorService">
+		</service>
+		
+		<service android:name=".MediaButtonReceiverService">
 		</service>
 		
 		
