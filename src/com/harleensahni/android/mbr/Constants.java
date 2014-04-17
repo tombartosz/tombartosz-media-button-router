@@ -37,4 +37,13 @@ public class Constants {
     public static final String HIDDEN_APPS_KEY = "hidden_apps";
     public static final String LAST_MEDIA_BUTTON_RECEIVER = "last_media_button_receiver";
     public static final String DISABLE_TTS = "disable_tts";
+    
+    public static final String INTENT_MEDIA_BUTTON_RECEIVER_SERVICE = "com.harleensahni.android.MEDIA_BUTTON_RECEIVER_SERVICE";
+    public static final String ONE_BUTTON_MODE_PREF_KEY = "one_button_mode";
+    public static final String CURRENT_AUDIO_PLAYER_NAME = "current_audio_player_name";
+    public static final String CURRENT_AUDIO_PLAYER_PACKAGE = "current_audio_player_pkg";
+    public static final String CURRENT_AUDIO_PLAYER_IS_ACTIVE = "current_audio_player_is_active";
+    public static final String SELECTION_ACTED_KEY = "btButtonSelectionActed";
+
+
 }

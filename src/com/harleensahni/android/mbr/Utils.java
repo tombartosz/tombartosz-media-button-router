@@ -15,12 +15,20 @@
  */
 package com.harleensahni.android.mbr;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
+import com.harleensahni.android.mbr.receivers.MediaButtonReceiver;
+
 import android.app.Activity;
+import android.app.ActivityManager;
+import android.app.ActivityManager.RecentTaskInfo;
 import android.app.AlertDialog;
 import android.app.AlertDialog.Builder;
+import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -36,6 +44,7 @@ import android.text.Html;
 import android.text.Spanned;
 import android.util.Log;
 import android.view.KeyEvent;
+import android.widget.Toast;
 
 /**
  * Utility class.
@@ -72,6 +81,11 @@ public final class Utils {
                 || keyCode == KeyEvent.KEYCODE_HEADSETHOOK;
     }
 
+    public static void forwardKeyCodeToComponent(Context context, ComponentName selectedReceiver, boolean launch,
+            int keyCode, BroadcastReceiver cleanUpReceiver) {
+    	forwardKeyCodeToComponent(context, selectedReceiver, launch, keyCode, cleanUpReceiver, false);
+    }
+
     /**
      * Forwards {@code keyCode} to receiver specified as two key events, one for
      * up and one for down. Optionally launches the application for the
@@ -84,17 +98,19 @@ public final class Utils {
      * @param cleanUpReceiver
      */
     public static void forwardKeyCodeToComponent(Context context, ComponentName selectedReceiver, boolean launch,
-            int keyCode, BroadcastReceiver cleanUpReceiver) {
+            int keyCode, BroadcastReceiver cleanUpReceiver,  boolean mbrIgnore) {
 
         Intent mediaButtonDownIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
         KeyEvent downKe = new KeyEvent(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), KeyEvent.ACTION_DOWN,
                 keyCode, 0);
         mediaButtonDownIntent.putExtra(Intent.EXTRA_KEY_EVENT, downKe);
+        if (mbrIgnore) mediaButtonDownIntent.putExtra("mbrIgnore", true);
 
         Intent mediaButtonUpIntent = new Intent(Intent.ACTION_MEDIA_BUTTON);
         KeyEvent upKe = new KeyEvent(SystemClock.uptimeMillis(), SystemClock.uptimeMillis(), KeyEvent.ACTION_UP,
                 keyCode, 0);
         mediaButtonUpIntent.putExtra(Intent.EXTRA_KEY_EVENT, upKe);
+        if (mbrIgnore) mediaButtonUpIntent.putExtra("mbrIgnore", true);
 
         mediaButtonDownIntent.setComponent(selectedReceiver);
         mediaButtonUpIntent.setComponent(selectedReceiver);
@@ -115,7 +131,15 @@ public final class Utils {
             Intent launchIntent = context.getPackageManager().getLaunchIntentForPackage(
                     selectedReceiver.getPackageName());
             if (launchIntent != null) {
+//                context.startActivity(launchIntent);
+            	try {
                 context.startActivity(launchIntent);
+            	} catch (ActivityNotFoundException e) {
+            		//Alright. The straightforward approach didn't work.
+            		//Try this way instead...
+            		startApplication(context, selectedReceiver.getPackageName());
+            	}
+            
             }
         }
 
@@ -143,16 +167,38 @@ public final class Utils {
 
         List<ResolveInfo> mediaReceivers = packageManager.queryBroadcastReceivers(mediaButtonIntent,
                 PackageManager.GET_INTENT_FILTERS | PackageManager.GET_RESOLVED_FILTER);
-        if (filterHidden) {
 
-            String hiddenReceiverIdsString = PreferenceManager.getDefaultSharedPreferences(context).getString(
-                    Constants.HIDDEN_APPS_KEY, "");
-            List<String> hiddenIds = Arrays.asList(hiddenReceiverIdsString.split(","));
+	    String hiddenReceiverIdsString = "";
+	    List<String> hiddenIds = new ArrayList<String>();
+	    
+	    if (filterHidden) {
+	    	hiddenReceiverIdsString = PreferenceManager.getDefaultSharedPreferences(context).getString(Constants.HIDDEN_APPS_KEY, "");
+	    	hiddenIds = Arrays.asList(hiddenReceiverIdsString.split(","));
+	    }
 
             for (int i = mediaReceivers.size() - 1; i >= 0; i--) {
+	        
                 ResolveInfo mediaReceiverResolveInfo = mediaReceivers.get(i);
               
-                if (hiddenIds.contains(getMediaReceiverUniqueID(mediaReceiverResolveInfo, packageManager))) {
+	    	if (MediaButtonReceiver.class.getName().equals(mediaReceiverResolveInfo.activityInfo.name)) {
+	        	mediaReceivers.remove(i);
+	            if (!filterHidden) {
+	            	break;
+	            }
+	        }
+	        else if (filterHidden) {
+	
+	            // i have to be more exact than just application name because
+	            // the two versions (old and new) of google music
+	            // have the same classnames for their intent receivers. I need
+	            // to know where their apks live to be able to differentiate.
+//	            String name = mediaReceiverResolveInfo.activityInfo.applicationInfo.sourceDir
+//	                    + mediaReceiverResolveInfo.activityInfo.name;
+	        	
+           	 	String name = Utils.getMediaReceiverUniqueID(mediaReceiverResolveInfo, packageManager);
+
+	        	
+	            if (hiddenIds.contains(name)) {
                     mediaReceivers.remove(i);
                 }
             }
@@ -160,6 +206,133 @@ public final class Utils {
 
         return mediaReceivers;
     }
+    
+	/**
+     * Gets the list of available voice command apps, optionally filtering out ones
+     * the user has indicated should be hidden in preferences.
+     * 
+     * @param packageManager
+     *            The {@code PackageManager} used to retrieve voice command
+     *            apps.
+     * 
+     * @param filterHidden
+     *            Whether user-hidden voice command apps should be shown.
+     * @return The list of {@code ResolveInfo} for different voice command
+     *         apps.
+     */
+    public static List<ResolveInfo> getVoiceCommandApps(PackageManager packageManager, boolean filterHidden,
+            Context context) {
+    	
+        Intent voiceCommandIntent = new Intent(Intent.ACTION_VOICE_COMMAND);
+        List<ResolveInfo> voiceCommandApps = packageManager.queryIntentActivities(voiceCommandIntent,
+                PackageManager.GET_INTENT_FILTERS | PackageManager.GET_RESOLVED_FILTER);
+        
+        String hiddenReceiverIdsString = "";
+        List<String> hiddenIds = new ArrayList<String>();
+        
+        if (filterHidden) {
+        	hiddenReceiverIdsString = PreferenceManager.getDefaultSharedPreferences(context).getString(Constants.HIDDEN_APPS_KEY, "");
+        	hiddenIds = Arrays.asList(hiddenReceiverIdsString.split(","));
+        }
+        
+        for (int i = voiceCommandApps.size() - 1; i >= 0; i--) {
+        	
+            ResolveInfo voiceCommandAppResolveInfo = voiceCommandApps.get(i);
+                        
+            if (ReceiverSelector.class.getName().equals(voiceCommandAppResolveInfo.activityInfo.name)) {
+            	voiceCommandApps.remove(i);
+                if (!filterHidden) {
+                	break;
+                }
+            }
+            else if (filterHidden) {
+            	
+            	// i have to be more exact than just application name because
+                // the two versions (old and new) of google music
+                // have the same classnames for their intent receivers. I need
+                // to know where their apks live to be able to differentiate.
+                
+            	//String name = voiceCommandAppResolveInfo.activityInfo.applicationInfo.sourceDir
+                //        + voiceCommandAppResolveInfo.activityInfo.name;
+            	 String name = Utils.getMediaReceiverUniqueID(voiceCommandAppResolveInfo, packageManager);
+            	 
+            	if (hiddenIds.contains(name)) {
+            		voiceCommandApps.remove(i);
+            	} 
+            }
+        }
+
+        return voiceCommandApps;
+    }
+    
+    
+    public static List<ResolveInfo> getAllReceivers(PackageManager packageManager, boolean filterHidden,
+            boolean performSort, Context context) {
+    	
+    			String currAudioPlayerPkg = PreferenceManager.getDefaultSharedPreferences(context).getString(
+    					Constants.CURRENT_AUDIO_PLAYER_PACKAGE, null);
+    			String currAudioPlayerName = PreferenceManager.getDefaultSharedPreferences(context).getString(
+    					Constants.CURRENT_AUDIO_PLAYER_NAME, null);
+    			
+    			List<ResolveInfo> allReceivers = new ArrayList<ResolveInfo>();
+    			List<ResolveInfo> mediaReceivers = getMediaReceivers(packageManager, filterHidden, context); 			
+    			List<ResolveInfo> voiceCommandApps = getVoiceCommandApps(packageManager, filterHidden, context);
+    			  			
+    			if (performSort) {
+    				
+    				ResolveInfo currAudioPlayerRI = null;
+        			ResolveInfo highestPriorityVoiceCommandApp = null;
+    				
+        			if (voiceCommandApps.size() > 0) {
+		    			Collections.sort(voiceCommandApps, new Comparator<ResolveInfo>(){
+		   				 
+		    	            public int compare(ResolveInfo r1, ResolveInfo r2) {
+		    	               return r2.priority - r1.priority;
+		    	            }
+		    	 
+		    	        });
+	    			
+		    			highestPriorityVoiceCommandApp = voiceCommandApps.get(0);
+		    			voiceCommandApps.remove(0);
+        			}
+    			
+	    			for (ResolveInfo r1:mediaReceivers) {
+						if (r1.activityInfo.packageName.equals(currAudioPlayerPkg) &&
+							r1.activityInfo.name.equals(currAudioPlayerName)) {
+							currAudioPlayerRI = r1;
+							mediaReceivers.remove(currAudioPlayerRI);
+							break;
+						}
+	    			}
+	    			
+	    			//Join the rest and sort...
+	    			mediaReceivers.addAll(voiceCommandApps);
+	    			Collections.sort(mediaReceivers, new Comparator<ResolveInfo>(){
+		   				 
+	    	            public int compare(ResolveInfo r1, ResolveInfo r2) {
+	    	               return r2.priority - r1.priority;
+	    	            }
+	    	 
+	    	        });
+	    			
+	    			
+	    			if (currAudioPlayerRI != null) {
+	    				allReceivers.add(currAudioPlayerRI);
+	    			}
+	    			if (highestPriorityVoiceCommandApp != null) {
+	    				allReceivers.add(highestPriorityVoiceCommandApp);
+	    			}
+	    			allReceivers.addAll(mediaReceivers);
+	    			
+    			}
+    			
+    			else {
+    				allReceivers.addAll(mediaReceivers);
+    				allReceivers.addAll(voiceCommandApps);
+    			}
+    			
+    			return allReceivers;    	
+    }	
     
     public static String getMediaReceiverUniqueID(ResolveInfo resolveInfo, PackageManager packageManager) {
         String receiverId = resolveInfo.activityInfo.name;
@@ -233,4 +406,33 @@ public final class Utils {
 
         return android.os.Build.VERSION.SDK_INT >= ICS_API_LEVEL;
     }
+    
+    private static void launchComponent(Context context, String packageName, String name){
+        Intent launch_intent = new Intent("android.intent.action.VIEW");
+        launch_intent.addCategory("android.intent.category.DEFAULT");
+        launch_intent.setComponent(new ComponentName(packageName, name));
+        launch_intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+
+        context.startActivity(launch_intent);
+    }
+
+    public static void startApplication(Context context, String application_name){
+        try{
+            Intent intent = new Intent("android.intent.action.VIEW");
+            intent.addCategory("android.intent.category.DEFAULT");
+            
+            //intent.addFlags(Intent.FLAG_ACTIVITY_NO_ANIMATION | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            List<ResolveInfo> resolveinfo_list = context.getPackageManager().queryIntentActivities(intent, 0);
+
+            for(ResolveInfo info:resolveinfo_list){
+                if(info.activityInfo.packageName.equalsIgnoreCase(application_name)){
+                    launchComponent(context, info.activityInfo.packageName, info.activityInfo.name);
+                    break;
+                }
+            }
+        }
+        catch (ActivityNotFoundException e) {
+            Toast.makeText(context.getApplicationContext(), "There was a problem loading the application: "+application_name,Toast.LENGTH_SHORT).show();
+        }
+    }    
 }
