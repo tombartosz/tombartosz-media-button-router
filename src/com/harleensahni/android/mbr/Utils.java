@@ -21,6 +21,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 
+import com.harleensahni.android.mbr.data.Receiver;
 import com.harleensahni.android.mbr.receivers.MediaButtonReceiver;
 
 import android.app.Activity;

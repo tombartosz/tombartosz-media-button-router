@@ -17,6 +17,7 @@ package com.harleensahni.android.mbr;
 
 import static com.harleensahni.android.mbr.Constants.TAG;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import java.util.Set;
@@ -36,6 +37,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.ResolveInfo;
+import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
@@ -61,6 +63,7 @@ import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 
+import com.harleensahni.android.mbr.data.Receiver;
 import com.harleensahni.android.mbr.receivers.MediaButtonReceiver;
 
 /**
@@ -113,7 +116,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
      * The {@code BroadcastReceiver}'s registered in the system for *
      * {@link Intent.ACTION_MEDIA_BUTTON}.
      */
-    private List<ResolveInfo> allReceivers;
+    private List<Receiver> allReceivers;
 
     /** The intent filter for registering our local {@code BroadcastReceiver}. */
     private IntentFilter uiIntentFilter;
@@ -206,7 +209,19 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
                             break;
                         case KeyEvent.KEYCODE_HEADSETHOOK:
                         case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
-                            select();
+                        	/*
+                        	 * If user wants to confirm by timer, we should not allow
+                        	 * to confirm by PLAY/PASUE. In some bluetooth devices with one button
+                        	 * i.e Scala Rider Q3, button function changes when playing music i.e:
+                        	 * -> Music is stopped - Button act as PLAY/PAUSE (short click)
+                        	 * -> Music is playing - Button act as NEXT (short click), PREV (double click) 
+                        	 * or PAUSE (long click).
+                        	 * 
+                        	 * When button behavior changes - it takes while.
+                        	 */
+                        	if (preferences.getBoolean(Constants.CONFIRM_ACTION_PREF_KEY, true)) {
+                        		select();
+                        	}
                             break;
                         case KeyEvent.KEYCODE_MEDIA_STOP:
                             // just cancel
@@ -280,13 +295,63 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
             String textToSpeak = null;
             if (btButtonSelection >= 0 && btButtonSelection < allReceivers.size()) {
                 textToSpeak = String.format(getString(R.string.application_announce_speak_text), actionText,
-                        Utils.getAppName(allReceivers.get(btButtonSelection), getPackageManager()));
+                        allReceivers.get(btButtonSelection).getName(), getPackageManager());
             } else {
                 textToSpeak = String.format(getString(R.string.announce_speak_text), actionText);
             }
             textToSpeech.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null);
             announced = true;
         }
+    }
+    
+    private void createReceiverList() {
+    	List<ResolveInfo >allResolveInfo = Utils.getAllReceivers(getPackageManager(), true, true, getApplicationContext());
+    	allReceivers = new ArrayList<Receiver>();
+    	
+    	for (final ResolveInfo resolveInfo : allResolveInfo) {
+    		final String name = Utils.getAppName(resolveInfo, getPackageManager());
+    		final Drawable icon = resolveInfo.loadIcon(getPackageManager());
+			Receiver currReceiver = new Receiver(){
+				@Override
+				public void onSelect(int position) {
+					
+					SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(ReceiverSelector.this);
+	            	String currAudioPlayerName = prefs.getString(Constants.CURRENT_AUDIO_PLAYER_NAME, null);
+	            	String currAudioPlayerPkg = prefs.getString(Constants.CURRENT_AUDIO_PLAYER_PACKAGE, null);
+	            	
+	            	if (!resolveInfo.activityInfo.packageName.equals(currAudioPlayerPkg)) {
+	            		
+	            		//Remove the current audio player properties if we selected something else.
+	            		preferences.edit().remove(Constants.CURRENT_AUDIO_PLAYER_NAME)
+	  				  					  .remove(Constants.CURRENT_AUDIO_PLAYER_PACKAGE)
+	  				  					  .commit();
+	            	}
+
+	                ComponentName selectedReceiver = new ComponentName(resolveInfo.activityInfo.packageName,
+	                        resolveInfo.activityInfo.name);
+	                Utils.forwardKeyCodeToComponent(ReceiverSelector.this, selectedReceiver, true,
+	                        Utils.getAdjustedKeyCode(trappedKeyEvent),
+	                        new SweepBroadcastReceiver(selectedReceiver.toString()));
+	                // save the last acted on app in case we have no idea who is
+	                // playing music so we can make a guess
+	            	preferences.edit().putString(Constants.CURRENT_AUDIO_PLAYER_NAME, resolveInfo.activityInfo.name)
+	  								  .putString(Constants.CURRENT_AUDIO_PLAYER_PACKAGE, resolveInfo.activityInfo.packageName)
+	  								  .commit();
+	                
+					
+					
+					super.onSelect(position);
+				}
+			};
+			
+			currReceiver.setIcon(icon);
+			currReceiver.setName(name);
+			
+			allReceivers.add(currReceiver);
+		}
+    	
+    	
+    	
     }
 
     /**
@@ -324,7 +389,21 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
         btButtonSelection = 0;
 //        btButtonSelection = preferences.getInt(SELECTION_KEY, -1);
 
-        allReceivers = Utils.getAllReceivers(getPackageManager(), true, true, getApplicationContext());
+        createReceiverList();
+        
+        Receiver cancelReceiver = new Receiver() {
+        	@Override
+        	public void onSelect(int position) {
+        		
+        		finish();
+        		
+        		super.onSelect(position);
+        	}
+        };
+        cancelReceiver.setName("Cancel");
+        Drawable cancelIcon = getResources().getDrawable(R.drawable.dagobert83_cancel);
+        cancelReceiver.setIcon(cancelIcon);
+        allReceivers.add(cancelReceiver);
 
         Boolean lastAnnounced = (Boolean) getLastNonConfigurationInstance();
         if (lastAnnounced != null) {
@@ -346,6 +425,8 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
         // apps,
         // right now apps are sorted by priority (not set by the user, set by
         // the app authors.. )
+        
+        
         setListAdapter(new BaseAdapter() {
 
             @Override
@@ -372,21 +453,21 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
                     view = vi.inflate(R.layout.media_receiver_view, null);
                 }
 
-                ResolveInfo resolveInfo = allReceivers.get(position);
+                Receiver receiver = allReceivers.get(position);
                 view.findViewById(R.id.receiverSelectionIndicator).setVisibility(
                         btButtonSelection == position ? View.VISIBLE : view.INVISIBLE);
 
                 ImageView imageView = (ImageView) view.findViewById(R.id.receiverAppImage);
-                imageView.setImageDrawable(resolveInfo.loadIcon(getPackageManager()));
+                imageView.setImageDrawable(receiver.getIcon());
 
                 TextView textView = (TextView) view.findViewById(R.id.receiverAppName);
-                textView.setText(Utils.getAppName(resolveInfo, getPackageManager()));
+                textView.setText(receiver.getName());
                 return view;
 
             }
         });
         header = (TextView) findViewById(R.id.dialogHeader);
-        cancelButton = findViewById(R.id.cancelButton);
+       /* cancelButton = findViewById(R.id.cancelButton);
         cancelButton.setOnClickListener(new OnClickListener() {
 
             @Override
@@ -394,6 +475,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
                 finish();
             }
         });
+        */
         mediaImage = (ImageView) findViewById(R.id.mediaImage);
 
         /* COMMENTED OUT FOR MARKET RELEASE Log.i(TAG, "Media Button Selector: created."); */
@@ -485,7 +567,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
             trappedKeyEvent = (KeyEvent) getIntent().getExtras().get(Intent.EXTRA_KEY_EVENT);
            	}
 
-            /* COMMENTED OUT FOR MARKET RELEASE Log.i(TAG, "Media Button Selector: handling event: " + trappedKeyEvent + " from intent:" + getIntent()); */
+            Log.i(TAG, "Media Button Selector: handling event: " + trappedKeyEvent + " from intent:" + getIntent()); 
 
             getListView().setChoiceMode(ListView.CHOICE_MODE_SINGLE);
             getListView().setClickable(true);
@@ -513,7 +595,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
                 getListView().setSelection(btButtonSelection);
             }
         } else {
-            /* COMMENTED OUT FOR MARKET RELEASE Log.i(TAG, "Media Button Selector: launched without key event, started with intent: " + getIntent()); */
+            Log.i(TAG, "Media Button Selector: launched without key event, started with intent: " + getIntent());
 
             trappedKeyEvent = null;
             getListView().setClickable(false);
@@ -623,12 +705,16 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
      *            The index of the receiver to select. Must be in bounds.
      */
     private void forwardToMediaReceiver(int position) {
-        ResolveInfo resolveInfo = allReceivers.get(position);
-        if (resolveInfo != null) {
+        Receiver receiver = allReceivers.get(position);
+        if (receiver != null) {
             if (trappedKeyEvent != null) {
 
+            	receiver.onSelect(position);
             	
-            	SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+            	finish();
+            	
+            	
+            	/*SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
             	String currAudioPlayerName = prefs.getString(Constants.CURRENT_AUDIO_PLAYER_NAME, null);
             	String currAudioPlayerPkg = prefs.getString(Constants.CURRENT_AUDIO_PLAYER_PACKAGE, null);
             	
@@ -650,7 +736,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
             	preferences.edit().putString(Constants.CURRENT_AUDIO_PLAYER_NAME, resolveInfo.activityInfo.name)
   								  .putString(Constants.CURRENT_AUDIO_PLAYER_PACKAGE, resolveInfo.activityInfo.packageName)
   								  .commit();
-                finish();
+                finish();*/
             }
         }
     }
@@ -682,7 +768,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
         getListView().setSelection(btButtonSelection);
 
         if (textToSpeech != null) {
-            textToSpeech.speak(Utils.getAppName(allReceivers.get(btButtonSelection), getPackageManager()),
+            textToSpeech.speak(allReceivers.get(btButtonSelection).getName(),
                     TextToSpeech.QUEUE_FLUSH, null);
         }
 
@@ -731,6 +817,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
      */
     private void requestAudioFocus() {
         if (!audioFocus) {
+        	Log.d(TAG, "Request audio focus");
         	if (audioManager.isBluetoothScoOn()) {
         		audioManager.setBluetoothScoOn(false);
         	}
