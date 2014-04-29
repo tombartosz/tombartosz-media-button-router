@@ -96,6 +96,10 @@ import com.harleensahni.android.mbr.receivers.MediaButtonReceiver;
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "onStartCommand(" + intent + ", " + flags + ", " + startId);
         registerMediaButtonReceiver();
+       
+        
+        
+        
         return START_STICKY;
     }
 

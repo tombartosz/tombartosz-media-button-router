@@ -21,6 +21,8 @@ import android.media.AudioManager;
 import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.preference.PreferenceManager;
+import android.telephony.PhoneStateListener;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.KeyEvent;
 
@@ -33,9 +35,11 @@ public class MediaButtonReceiverService extends IntentService {
 	@Override
 	protected void onHandleIntent(Intent intent) {
 		
+		
+		
 		Context context = this;
 		ActivityManager activityManager = ((ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE));
-        
+		
         // Try to figure out if our selector is currently open; if so,
 		// rebroadcast the keypress to it.
 		
