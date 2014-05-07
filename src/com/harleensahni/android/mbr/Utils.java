@@ -266,6 +266,7 @@ public final class Utils {
         return voiceCommandApps;
     }
     
+
     
     public static List<ResolveInfo> getAllReceivers(PackageManager packageManager, boolean filterHidden,
             boolean performSort, Context context) {

@@ -36,6 +36,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.graphics.drawable.Drawable;
 import android.media.AudioManager;
@@ -65,6 +66,7 @@ import android.widget.TextView;
 
 import com.harleensahni.android.mbr.data.Receiver;
 import com.harleensahni.android.mbr.receivers.MediaButtonReceiver;
+import com.harleensahni.android.mbr.utils.AndroidAppsUtils;
 
 /**
  * Allows the user to choose which media receiver will handle a media button
@@ -256,12 +258,15 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
 
     /** Preferences. */
     private SharedPreferences preferences;
+    
+    private AndroidAppsUtils androidAppsUtils;
 
     /**
      * {@inheritDoc}
      */
     @Override
     public void onInit(int status) {
+    	
         // text to speech initialized
         // XXX This is where we announce to the user what we're handling. It's
         // not clear that this will always get called. I don't know how else to
@@ -305,12 +310,21 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
     }
     
     private void createReceiverList() {
-    	List<ResolveInfo >allResolveInfo = Utils.getAllReceivers(getPackageManager(), true, true, getApplicationContext());
+    	
+    	final Context context = getApplicationContext();
+    	final PackageManager packageManager = getPackageManager();
+    	
+    	int stringId = context.getApplicationInfo().labelRes;
+        String myAppName = context.getString(stringId);
+    	
+    	androidAppsUtils = new AndroidAppsUtils(context);
+    	
+    	List<ResolveInfo >allResolveInfo = Utils.getAllReceivers(packageManager, true, true, context);
     	allReceivers = new ArrayList<Receiver>();
     	
     	for (final ResolveInfo resolveInfo : allResolveInfo) {
-    		final String name = Utils.getAppName(resolveInfo, getPackageManager());
-    		final Drawable icon = resolveInfo.loadIcon(getPackageManager());
+    		final String name = Utils.getAppName(resolveInfo, packageManager);
+    		final Drawable icon = resolveInfo.loadIcon(packageManager);
 			Receiver currReceiver = new Receiver(){
 				@Override
 				public void onSelect(int position) {
@@ -337,20 +351,42 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
 	            	preferences.edit().putString(Constants.CURRENT_AUDIO_PLAYER_NAME, resolveInfo.activityInfo.name)
 	  								  .putString(Constants.CURRENT_AUDIO_PLAYER_PACKAGE, resolveInfo.activityInfo.packageName)
 	  								  .commit();
-	                
-					
-					
-					super.onSelect(position);
+
 				}
 			};
 			
 			currReceiver.setIcon(icon);
 			currReceiver.setName(name);
 			
-			allReceivers.add(currReceiver);
+		
+			if (!currReceiver.getName().trim().equals(myAppName)) {
+				allReceivers.add(currReceiver);
+			}
+
 		}
     	
+    	// Get running apps to the selector
+    	List<Receiver> runningAppsReceivers = androidAppsUtils.getRunningAppsBringToFrontReceivers();
     	
+    	//Add only this running apps which are not in configuration
+    	for (Receiver nReceiver : runningAppsReceivers) {
+    		boolean add = true;
+			
+    		if (nReceiver.getName().trim().equals(myAppName)) {
+    			continue;
+    		}
+    		
+    		for (Receiver aReceiver  : allReceivers) {
+				if (aReceiver.getName().trim().equals(nReceiver.getName().trim())) {
+					add = false;
+					break;
+				}
+			}
+			
+			if (add) {
+				allReceivers.add(nReceiver);
+			}
+    	}
     	
     }
 
@@ -396,8 +432,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
         	public void onSelect(int position) {
         		
         		finish();
-        		
-        		super.onSelect(position);
+     
         	}
         };
         cancelReceiver.setName("Cancel");

@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.harleensahni.android.mbr.receivers.MediaButtonReceiver;
+import com.harleensahni.android.mbr.utils.AndroidAppsUtils;
 
 import android.app.ActivityManager;
 import android.app.IntentService;
@@ -27,17 +28,17 @@ import android.util.Log;
 import android.view.KeyEvent;
 
 public class MediaButtonReceiverService extends IntentService {
+	
 
 	public MediaButtonReceiverService() {
 	      super("MediaButtonReceiverService");
 	}
 	
 	@Override
-	protected void onHandleIntent(Intent intent) {
-		
-		
+	protected void onHandleIntent(Intent intent) {	
 		
 		Context context = this;
+		
 		ActivityManager activityManager = ((ActivityManager) context.getSystemService(Context.ACTIVITY_SERVICE));
 		
         // Try to figure out if our selector is currently open; if so,

@@ -10,40 +10,40 @@ import android.widget.Toast;
 
 public class CallReciever extends BroadcastReceiver {
 
+	private static boolean wasBluetoothEnabledDuringCall = false;
+
 	@Override
 	public void onReceive(Context context, Intent intent) {
 
+		BluetoothAdapter mBluetoothAdapter = BluetoothAdapter
+				.getDefaultAdapter();
+
 		if (intent.getStringExtra(TelephonyManager.EXTRA_STATE).equals(
-				TelephonyManager.EXTRA_STATE_RINGING)) {
+				TelephonyManager.EXTRA_STATE_OFFHOOK)) {
+			CallReciever.wasBluetoothEnabledDuringCall = mBluetoothAdapter
+					.isEnabled();
+			return;
+		}
 
-			// Phone number
-			String incomingNumber = intent
-					.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
+		if (intent.getStringExtra(TelephonyManager.EXTRA_STATE).equals(
+				TelephonyManager.EXTRA_STATE_IDLE)) {
 
-			// Ringing state
-			// This code will execute when the phone has an incoming call
-		} else if (intent.getStringExtra(TelephonyManager.EXTRA_STATE).equals(
-				TelephonyManager.EXTRA_STATE_IDLE)
-		/*
-		 * || intent.getStringExtra(TelephonyManager.EXTRA_STATE).equals(
-		 * TelephonyManager.EXTRA_STATE_OFFHOOK)
-		 */) {
+			// Disable and enable bluetooth bluetooth
 
-			// Disable bluetooth
-			BluetoothAdapter mBluetoothAdapter = BluetoothAdapter
-					.getDefaultAdapter();
-			if (mBluetoothAdapter.isEnabled()) {
-				mBluetoothAdapter.disable();
+			if (CallReciever.wasBluetoothEnabledDuringCall) {
+				if (mBluetoothAdapter.isEnabled()) {
+					mBluetoothAdapter.disable();
+				}
+
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				mBluetoothAdapter.enable();
 			}
-			try {
-				Thread.sleep(1000);
-			} catch (InterruptedException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			mBluetoothAdapter.enable();
 			final Toast toast = Toast.makeText(context,
-					"This message will disappear     in half second",
+					"Restart bluetooth module ...",
 					Toast.LENGTH_SHORT);
 			toast.show();
 
@@ -53,8 +53,8 @@ public class CallReciever extends BroadcastReceiver {
 				public void run() {
 					toast.cancel();
 				}
-			}, 500);
-			// This code will execute when the call is answered or disconnected
+			}, 1000);
+		
 		}
 
 	}
