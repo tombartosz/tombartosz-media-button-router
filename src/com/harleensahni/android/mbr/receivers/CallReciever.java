@@ -29,8 +29,13 @@ public class CallReciever extends BroadcastReceiver {
 				TelephonyManager.EXTRA_STATE_IDLE)) {
 
 			// Disable and enable bluetooth bluetooth
-
+			final Toast toast = Toast.makeText(context,
+					"Restart bluetooth module ...",
+					Toast.LENGTH_SHORT);
+			
 			if (CallReciever.wasBluetoothEnabledDuringCall) {
+
+				toast.show();
 				if (mBluetoothAdapter.isEnabled()) {
 					mBluetoothAdapter.disable();
 				}
@@ -42,10 +47,7 @@ public class CallReciever extends BroadcastReceiver {
 				}
 				mBluetoothAdapter.enable();
 			}
-			final Toast toast = Toast.makeText(context,
-					"Restart bluetooth module ...",
-					Toast.LENGTH_SHORT);
-			toast.show();
+
 
 			Handler handler = new Handler();
 			handler.postDelayed(new Runnable() {

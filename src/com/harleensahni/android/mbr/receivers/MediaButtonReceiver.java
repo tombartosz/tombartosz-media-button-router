@@ -42,6 +42,8 @@ public class MediaButtonReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
 
+    	Toast.makeText(context, "Starting ...", Toast.LENGTH_SHORT).show();
+    	
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
 
     	if (!intent.getBooleanExtra("mbrIgnore", false) &&
@@ -60,15 +62,18 @@ public class MediaButtonReceiver extends BroadcastReceiver {
             int keyCode = Utils.getAdjustedKeyCode(keyEvent);
 
             // Don't want to capture volume buttons
-            if (Utils.isMediaButton(keyCode)) {
-		        	Intent receiver_service_intent = new Intent(context, MediaButtonReceiverService.class);
-	                receiver_service_intent.putExtras(intent);
-	                context.startService(receiver_service_intent);
-                                    if (isOrderedBroadcast()) {
-                                        abortBroadcast();
-                                    }
-                                }
-                            }
-                        }
-}
+				if (Utils.isMediaButton(keyCode)) {
+					Intent receiver_service_intent = new Intent(context,
+							MediaButtonReceiverService.class);
+					receiver_service_intent.putExtras(intent);
+					context.startService(receiver_service_intent);
+					if (isOrderedBroadcast()) {
+						abortBroadcast();
+					}
+				}
+				
+				
+			}
+		}
+	}
 }
