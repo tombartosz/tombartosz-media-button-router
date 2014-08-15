@@ -20,16 +20,8 @@ import static com.harleensahni.android.mbr.Constants.TAG;
 import java.util.ArrayList;
 import java.util.List;
 
-import java.util.Set;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
-import java.util.concurrent.TimeUnit;
-
 import android.app.AlertDialog;
 import android.app.ListActivity;
-import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
@@ -44,11 +36,12 @@ import android.media.MediaPlayer;
 import android.media.MediaPlayer.OnCompletionListener;
 import android.os.Bundle;
 import android.os.PowerManager;
-import android.os.SystemClock;
 import android.os.PowerManager.WakeLock;
+import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.speech.tts.TextToSpeech;
 import android.speech.tts.TextToSpeech.OnInitListener;
+import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -56,7 +49,6 @@ import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.BaseAdapter;
@@ -67,6 +59,9 @@ import android.widget.TextView;
 import com.harleensahni.android.mbr.data.Receiver;
 import com.harleensahni.android.mbr.receivers.MediaButtonReceiver;
 import com.harleensahni.android.mbr.utils.AndroidAppsUtils;
+import com.harleensahni.android.mbr.utils.SimpleListener;
+import com.harleensahni.android.mbr.utils.TTS;
+import com.harleensahni.android.mbr.utils.Timer;
 
 /**
  * Allows the user to choose which media receiver will handle a media button
@@ -86,8 +81,6 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
 
         @Override
         public void onReceive(Context context, Intent intent) {
-            /* COMMENTED OUT FOR MARKET RELEASE Log.i(TAG, "Media Button Selector: After running broadcast receiver " + name + "have resultcode: "
-                    + getResultCode() + " result Data: " + getResultData()); */
         }
     }
 
@@ -101,11 +94,6 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
      */
     private static final String SELECTION_KEY = "btButtonSelection";
 
-
-    /**
-     * Number of seconds to wait before timing out and just cancelling.
-     */
-    private int timeoutTime;
 
     /**
      * The media button event that {@link MediaButtonReceiver} captured, and
@@ -123,9 +111,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
     /** The intent filter for registering our local {@code BroadcastReceiver}. */
     private IntentFilter uiIntentFilter;
 
-    /** The text to speech engine used to announce navigation to the user. */
-    private TextToSpeech textToSpeech;
-
+    
     /**
      * The receiver currently selected by bluetooth next/prev navigation. We
      * track this ourselves because there isn't persisted selection w/ touch
@@ -156,24 +142,10 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
      * Whether we've requested audio focus.
      */
     private boolean audioFocus;
-
-    /**
-     * ScheduledExecutorService used to time out and close activity if the user
-     * doesn't make a selection within certain amount of time. Resets on user
-     * interaction.
-     */
-    private ScheduledExecutorService timeoutExecutor;
-
-    /**
-     * ScheduledFuture of timeout.
-     */
-    private ScheduledFuture<?> timeoutScheduledFuture;
-
-    /** The cancel button. */
-    private View cancelButton;
-
-    private ImageView mediaImage;
-
+    
+    private Timer timer;
+    private TTS tts;
+    
     /** The header */
     private TextView header;
 
@@ -190,7 +162,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
 
         @Override
         public void onReceive(Context context, Intent intent) {
-
+        	
         	boolean usingOneButton = preferences.getBoolean(Constants.ONE_BUTTON_MODE_PREF_KEY, false);
        	
             if (Intent.ACTION_MEDIA_BUTTON.equals(intent.getAction())
@@ -198,7 +170,6 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
                 KeyEvent navigationKeyEvent = (KeyEvent) intent.getExtras().get(Intent.EXTRA_KEY_EVENT);
                 int keyCode = navigationKeyEvent.getKeyCode();
                 if (Utils.isMediaButton(keyCode)) {
-                    /* COMMENTED OUT FOR MARKET RELEASE Log.i(TAG, "Media Button Selector: UI is directly handling key: " + navigationKeyEvent); */
                     if (navigationKeyEvent.getAction() == KeyEvent.ACTION_UP) {
 						if (!usingOneButton) {
 							switch (Utils
@@ -213,7 +184,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
                         case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
                         	/*
                         	 * If user wants to confirm by timer, we should not allow
-                        	 * to confirm by PLAY/PASUE. In some bluetooth devices with one button
+                        	 * to confirm by PLAY/PAUSE. In some bluetooth devices with one button
                         	 * i.e Scala Rider Q3, button function changes when playing music i.e:
                         	 * -> Music is stopped - Button act as PLAY/PAUSE (short click)
                         	 * -> Music is playing - Button act as NEXT (short click), PREV (double click) 
@@ -304,7 +275,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
             } else {
                 textToSpeak = String.format(getString(R.string.announce_speak_text), actionText);
             }
-            textToSpeech.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null);
+            this.tts.say(textToSpeak);
             announced = true;
         }
     }
@@ -409,18 +380,10 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
 
         preferences = PreferenceManager.getDefaultSharedPreferences(this);
 
-        // TODO Handle text engine not installed, etc. Documented on android
-        // developer guide
-        boolean ttsDisabled = preferences.getBoolean(Constants.DISABLE_TTS, false);
-
-        textToSpeech = ttsDisabled ? null : new TextToSpeech(this, this);
+        initializeTTS();	
 
         audioManager = (AudioManager) this.getSystemService(AUDIO_SERVICE);
         powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
-
-        // XXX can't use integer array, argh:
-        // http://code.google.com/p/android/issues/detail?id=2096
-        timeoutTime = Integer.valueOf(preferences.getString(Constants.TIMEOUT_KEY, "5"));
 
         btButtonSelection = 0;
 //        btButtonSelection = preferences.getInt(SELECTION_KEY, -1);
@@ -445,23 +408,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
             announced = lastAnnounced;
         }
 
-//        // Remove our app's receiver from the list so users can't select it.
-//        // NOTE: Our local receiver isn't registered at this point so we don't
-//        // have to remove it.
-//        if (receivers != null) {
-//            for (int i = 0; i < receivers.size(); i++) {
-//                if (MediaButtonReceiver.class.getName().equals(receivers.get(i).activityInfo.name)) {
-//                    receivers.remove(i);
-//                    break;
-//                }
-//            }
-//        }
-        // TODO MAYBE sort allReceivers by MRU so user doesn't have to skip as many
-        // apps,
-        // right now apps are sorted by priority (not set by the user, set by
-        // the app authors.. )
-        
-        
+      
         setListAdapter(new BaseAdapter() {
 
             @Override
@@ -502,19 +449,20 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
             }
         });
         header = (TextView) findViewById(R.id.dialogHeader);
-       /* cancelButton = findViewById(R.id.cancelButton);
-        cancelButton.setOnClickListener(new OnClickListener() {
-
-            @Override
-            public void onClick(View v) {
-                finish();
-            }
-        });
-        */
-        mediaImage = (ImageView) findViewById(R.id.mediaImage);
-
-        /* COMMENTED OUT FOR MARKET RELEASE Log.i(TAG, "Media Button Selector: created."); */
     }
+
+	private void initializeTTS() {
+		this.tts = new TTS(this, this);
+        this.tts.setOnSpeechDone(new SimpleListener() {
+			
+			@Override
+			public void execute() {
+				if (timer != null) {
+					timer.resetTimeout();
+					}				
+			}
+		});
+	}
 
     /**
      * {@inheritDoc}
@@ -522,9 +470,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (textToSpeech != null) {
-            textToSpeech.shutdown();
-        }
+        this.tts.destroy();
         Log.d(TAG, "Media Button Selector: destroyed.");
     }
 
@@ -551,10 +497,8 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
         if (wakeLock.isHeld()) {
             wakeLock.release();
         }
-        if (textToSpeech != null) {
-            textToSpeech.stop();
-        }
-        timeoutExecutor.shutdownNow();
+        this.tts.pause();
+        timer.shutDown();
         audioManager.abandonAudioFocus(this);
         preferences.edit().putInt(SELECTION_KEY, btButtonSelection).commit();
     }
@@ -654,14 +598,10 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
                 | PowerManager.ON_AFTER_RELEASE, TAG);
         wakeLock.setReferenceCounted(false);
         wakeLock.acquire();
-        timeoutExecutor = Executors.newSingleThreadScheduledExecutor();
-        if (introDialog == null && eulaAcceptedAlready) {
-            // Don't time out in the middle of showing the dialog, that's rude.
-            // We could reset timeout here, but this is the first time the user
-            // is seeing the selection screen, so just let it stay till they
-            // dismiss.
-            resetTimeout();
-        }
+        
+        int timeoutTime = Integer.valueOf(preferences.getString(Constants.TIMEOUT_KEY, "5"));        
+        timer = new Timer(this, timeoutTime, onTimeout());
+        
     }
 
     /**
@@ -695,30 +635,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
         }
         return super.onOptionsItemSelected(item);
     }
-
-    /**
-     * Resets the timeout before the application is automatically dismissed.
-     */
-    private void resetTimeout() {
-        if (timeoutScheduledFuture != null) {
-            timeoutScheduledFuture.cancel(false);
-        }
-
-        timeoutScheduledFuture = timeoutExecutor.schedule(new Runnable() {
-            @Override
-            public void run() {
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        onTimeout();
-                    }
-                });
-
-            }
-        }, timeoutTime, TimeUnit.SECONDS);
-
-    }
-
+   
     /**
      * {@inheritDoc}
      */
@@ -727,8 +644,8 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
         super.onUserInteraction();
 
         // Reset timeout before we finish
-        if (!timeoutExecutor.isShutdown()) {
-            resetTimeout();
+        if (timer != null && !timer.isShutdown()) {
+            timer.resetTimeout();
         }
     }
 
@@ -786,7 +703,9 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
      *            The amount to move, may be positive or negative.
      */
     private void moveSelection(int amount) {
-        resetTimeout();
+    	if (timer != null) {
+    		timer.stopTimer();
+    	}
 
         btButtonSelection += amount;
 
@@ -802,12 +721,14 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
         getListView().invalidateViews();
         getListView().setSelection(btButtonSelection);
 
-        if (textToSpeech != null) {
-            textToSpeech.speak(allReceivers.get(btButtonSelection).getName(),
-                    TextToSpeech.QUEUE_FLUSH, null);
-        }
-
+        String textToSay = allReceivers.get(btButtonSelection).getName();
+        
+       
+        this.tts.say(textToSay);
+        
     }
+    
+
 
     /**
      * Select the currently selected receiver.
@@ -824,28 +745,42 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
     /**
      * Takes appropriate action to notify user and dismiss activity on timeout.
      */
-    private void onTimeout() {
-        Log.d(TAG, "Media Button Selector: Timed out waiting for user interaction, finishing activity");
-        final MediaPlayer timeoutPlayer = MediaPlayer.create(this, R.raw.dismiss);
-        timeoutPlayer.start();
-        // not having an on error listener results in on completion listener
-        // being called anyway
-        timeoutPlayer.setOnCompletionListener(new OnCompletionListener() {
+	private Runnable onTimeout() {
+		return new Runnable() {
 
-            public void onCompletion(MediaPlayer mp) {
-                timeoutPlayer.release();
-            }
-        });
+			@Override
+			public void run() {
+				Log.d(TAG,
+						"Media Button Selector: Timed out waiting for user interaction, finishing activity");
+				final MediaPlayer timeoutPlayer = MediaPlayer.create(
+						ReceiverSelector.this, R.raw.dismiss);
+				timeoutPlayer.start();
+				// not having an on error listener results in on completion
+				// listener
+				// being called anyway
+				timeoutPlayer
+						.setOnCompletionListener(new OnCompletionListener() {
 
-        // If the user has set their preference not to confirm actions, we'll
-        // just forward automatically to whoever was last selected. If no one is
-        // selected, it just acts like finish anyway.
-        if (preferences.getBoolean(Constants.CONFIRM_ACTION_PREF_KEY, true)) {
-            finish();
-        } else {
-            select();
-        }
-    }
+							public void onCompletion(MediaPlayer mp) {
+								timeoutPlayer.release();
+							}
+						});
+
+				// If the user has set their preference not to confirm actions,
+				// we'll
+				// just forward automatically to whoever was last selected. If
+				// no one is
+				// selected, it just acts like finish anyway.
+				if (preferences.getBoolean(Constants.CONFIRM_ACTION_PREF_KEY,
+						true)) {
+					finish();
+				} else {
+					select();
+				}
+
+			}
+		};
+	}
 
     /**
      * Requests audio focus if necessary.
