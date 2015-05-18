@@ -15,8 +15,18 @@ public class Preferences {
         Preferences.sharedPreferences = sharedPreferences;
     }
 
+    @Deprecated
+    public static SharedPreferences getPreferences() {
+        return  sharedPreferences;
+    }
+
     public static boolean isEnabled() {
         boolean isEnabled = sharedPreferences.getBoolean(Constants.ENABLED_PREF_KEY, true);
         return isEnabled;
+    }
+
+    public static String getLastMediaButtonReceiver() {
+        return sharedPreferences.getString(Constants.LAST_MEDIA_BUTTON_RECEIVER,
+                null);
     }
 }

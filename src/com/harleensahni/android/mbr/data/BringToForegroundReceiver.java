@@ -42,6 +42,7 @@ public class BringToForegroundReceiver extends Receiver {
 		setIcon(packageManager.getApplicationIcon(applicationInfo));
 	}
 
+
 	@Override
 	public void onSelect(int position) {
 		Intent launchIntent = context.getPackageManager()
@@ -58,7 +59,9 @@ public class BringToForegroundReceiver extends Receiver {
 		WakeLock wakeLock = pm.newWakeLock(PowerManager.FULL_WAKE_LOCK
 		                                 | PowerManager.ACQUIRE_CAUSES_WAKEUP
 		                                 | PowerManager.ON_AFTER_RELEASE, "MyWakeLock");
-		wakeLock.acquire();
+		wakeLock.acquire(Constants.WAKE_TIME);
+
+
 		
 /*		String last_media_button_receiver = preferences.getString(Constants.LAST_MEDIA_BUTTON_RECEIVER,
                 null);
@@ -71,6 +74,7 @@ public class BringToForegroundReceiver extends Receiver {
 		  				  .commit();*/
     	
     	Utils.forwardKeyCodeToComponent(context, null, false, KeyEvent.KEYCODE_MEDIA_PLAY, null, true);
+
 
 	}
 

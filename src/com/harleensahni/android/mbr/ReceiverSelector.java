@@ -595,7 +595,7 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
         wakeLock = powerManager.newWakeLock(PowerManager.ACQUIRE_CAUSES_WAKEUP | PowerManager.SCREEN_DIM_WAKE_LOCK
                 | PowerManager.ON_AFTER_RELEASE, TAG);
         wakeLock.setReferenceCounted(false);
-        wakeLock.acquire();
+        wakeLock.acquire(Constants.WAKE_TIME);
         
         int timeoutTime = Integer.valueOf(preferences.getString(Constants.TIMEOUT_KEY, "5"));        
         timer = new Timer(this, timeoutTime, onTimeout());

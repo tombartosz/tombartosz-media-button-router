@@ -27,6 +27,7 @@ import android.util.Log;
 import android.view.KeyEvent;
 import android.widget.Toast;
 
+import com.harleensahni.android.mbr.Constants;
 import com.harleensahni.android.mbr.MediaButtonReceiverService;
 import com.harleensahni.android.mbr.Utils;
 import com.harleensahni.android.mbr.utils.Preferences;
@@ -75,11 +76,15 @@ public class MediaButtonReceiver extends BroadcastReceiver {
             Log.d(TAG, "Media button press received. Button code: " + keyCode);
             if (Utils.isMediaButton(keyCode)) {
 
-                /* Start App */
-                Intent mediaButtonRouterServiceIntent = new Intent(context,
-                        MediaButtonReceiverService.class);
-                mediaButtonRouterServiceIntent.putExtras(intent);
-                context.startService(mediaButtonRouterServiceIntent);
+                if (keyEvent.getAction() == KeyEvent.ACTION_UP) {
+                    /* Start App only when button is pressed */
+                    Intent mediaButtonRouterServiceIntent = new Intent(context,
+                            MediaButtonReceiverService.class);
+
+                    mediaButtonRouterServiceIntent.putExtras(intent);
+                    mediaButtonRouterServiceIntent.putExtra(Constants.INTENT_KEY_CODE, keyCode);
+                    context.startService(mediaButtonRouterServiceIntent);
+                }
 
                 /* Now event will be handled by the App */
                 if (isOrderedBroadcast()) {

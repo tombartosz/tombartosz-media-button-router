@@ -30,6 +30,7 @@ public class Constants {
 
     public static final String INTENT_ACTION_VIEW_MEDIA_BUTTON_LIST = "com.harleensahni.android.VIEW_MEDIA_LIST";
     public static final String INTENT_ACTION_VIEW_MEDIA_LIST_KEYPRESS = "com.harleensahni.android.VIEW_MEDIA_LIST_KEYPRESS";
+    public static final String INTENT_KEY_CODE = "com.harleensahni.android.mbr.KEY_CODE";
     public static final String ENABLED_PREF_KEY = "enable_receiver";
     public static final String INTRO_SHOWN_KEY = "intro_shown";
     public static final String TIMEOUT_KEY = "timeout";
@@ -45,6 +46,8 @@ public class Constants {
     public static final String CURRENT_AUDIO_PLAYER_PACKAGE = "current_audio_player_pkg";
     public static final String CURRENT_AUDIO_PLAYER_IS_ACTIVE = "current_audio_player_is_active";
     public static final String SELECTION_ACTED_KEY = "btButtonSelectionActed";
+
+    public static final int WAKE_TIME = 20000;
 
 
 }

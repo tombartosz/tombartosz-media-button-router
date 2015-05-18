@@ -15,20 +15,19 @@
  */
 package com.harleensahni.android.mbr;
 
+import static com.harleensahni.android.mbr.Constants.TAG;
+
 import android.app.Service;
 import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.database.ContentObserver;
 import android.media.AudioManager;
 import android.net.Uri;
-import android.opengl.EGLExt;
 import android.os.Handler;
 import android.os.IBinder;
-import android.preference.PreferenceManager;
-import android.provider.MediaStore;
+
 import android.provider.Settings;
 import android.util.Log;
 
@@ -42,7 +41,7 @@ import com.harleensahni.android.mbr.receivers.MediaButtonReceiver;
  * @author Peter Haight
  */
  public class MediaButtonMonitorService extends Service {
-    public static final String TAG = "MediaButtonMonitorService";
+
     /**
      * Prevents executing thread for more than once
      */
