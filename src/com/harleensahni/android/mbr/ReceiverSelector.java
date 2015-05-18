@@ -39,9 +39,7 @@ import android.os.PowerManager;
 import android.os.PowerManager.WakeLock;
 import android.os.SystemClock;
 import android.preference.PreferenceManager;
-import android.speech.tts.TextToSpeech;
 import android.speech.tts.TextToSpeech.OnInitListener;
-import android.speech.tts.UtteranceProgressListener;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
@@ -661,9 +659,11 @@ public class ReceiverSelector extends ListActivity implements OnInitListener, Au
         if (receiver != null) {
             if (trappedKeyEvent != null) {
 
-            	receiver.onSelect(position);
-            	
-            	finish();
+                receiver.beforeSelect();
+                receiver.onSelect(position);
+
+
+                finish();
             	
             	
             	/*SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);

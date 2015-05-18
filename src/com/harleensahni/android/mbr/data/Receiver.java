@@ -2,6 +2,8 @@ package com.harleensahni.android.mbr.data;
 
 import android.graphics.drawable.Drawable;
 
+import com.harleensahni.android.mbr.MediaButtonMonitorService;
+
 public abstract class Receiver {
 	
 	private int position;
@@ -14,6 +16,11 @@ public abstract class Receiver {
 	 * @param position position in list
 	 */
 	public abstract void onSelect(int position);
+
+	public void beforeSelect() {
+				/* Re register media button event */
+		MediaButtonMonitorService.getService().registerMultimediaEventReceiventLater();
+	}
 
 	public int getPosition() {
 		return position;
