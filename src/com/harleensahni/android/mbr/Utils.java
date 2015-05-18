@@ -85,6 +85,7 @@ public final class Utils {
     public static void forwardKeyCodeToComponent(Context context, ComponentName selectedReceiver, boolean launch,
             int keyCode, BroadcastReceiver cleanUpReceiver) {
     	forwardKeyCodeToComponent(context, selectedReceiver, launch, keyCode, cleanUpReceiver, false);
+        MediaButtonMonitorService.getService().registerMultimediaEventReceiventLater();
     }
 
     /**

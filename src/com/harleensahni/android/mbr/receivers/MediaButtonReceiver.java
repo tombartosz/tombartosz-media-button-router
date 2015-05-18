@@ -21,20 +21,19 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
-import android.os.SystemClock;
 import android.preference.PreferenceManager;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.KeyEvent;
 import android.widget.Toast;
 
-import com.harleensahni.android.mbr.Constants;
 import com.harleensahni.android.mbr.MediaButtonReceiverService;
 import com.harleensahni.android.mbr.Utils;
+import com.harleensahni.android.mbr.utils.Preferences;
 
 /**
  * Handles routing media button intents to application that is playing music
- * 
+ *
  * @author Harleen Sahni
  */
 public class MediaButtonReceiver extends BroadcastReceiver {
@@ -42,38 +41,51 @@ public class MediaButtonReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
 
-    	Toast.makeText(context, "Starting ...", Toast.LENGTH_SHORT).show();
-    	
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
+        Preferences.init(preferences);
 
-    	if (!intent.getBooleanExtra("mbrIgnore", false) &&
-    		preferences.getBoolean(Constants.ENABLED_PREF_KEY, true)) {
+        boolean isAppEnabled = Preferences.isEnabled();
 
-	        TelephonyManager telephony = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
-	        if (telephony.getCallState() == TelephonyManager.CALL_STATE_OFFHOOK ||
-	        	telephony.getCallState() == TelephonyManager.CALL_STATE_RINGING) {
-                    return;
-                }
+        if (!isAppEnabled) {
+            /* if app is not enabled in Settings do nothing */
+            return;
+        }
+
+        if (intent.getBooleanExtra("mbrIgnore", false)) {
+			/* do nothing */
+            return;
+        }
+
+        TelephonyManager telephony = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
+        if (telephony.getCallState() == TelephonyManager.CALL_STATE_OFFHOOK ||
+                telephony.getCallState() == TelephonyManager.CALL_STATE_RINGING) {
+			/* in in call or ringing - do nothing */
+            return;
+        }
 
         if (Intent.ACTION_MEDIA_BUTTON.equals(intent.getAction())) {
 
-	            Log.i(TAG, "Media Button Receiver: received media button intent: " + intent);
+            Log.i(TAG, "Media Button Receiver: received media button intent: " + intent);
             KeyEvent keyEvent = (KeyEvent) intent.getExtras().get(Intent.EXTRA_KEY_EVENT);
             int keyCode = Utils.getAdjustedKeyCode(keyEvent);
 
-            // Don't want to capture volume buttons
-				if (Utils.isMediaButton(keyCode)) {
-					Intent receiver_service_intent = new Intent(context,
-							MediaButtonReceiverService.class);
-					receiver_service_intent.putExtras(intent);
-					context.startService(receiver_service_intent);
-					if (isOrderedBroadcast()) {
-						abortBroadcast();
-					}
-				}
-				
-				
-			}
-		}
-	}
+            /* Button press received here */
+            Toast.makeText(context, "Starting ...", Toast.LENGTH_SHORT).show();
+
+            Log.d(TAG, "Media button press received. Button code: " + keyCode);
+            if (Utils.isMediaButton(keyCode)) {
+
+                /* Start App */
+                Intent mediaButtonRouterServiceIntent = new Intent(context,
+                        MediaButtonReceiverService.class);
+                mediaButtonRouterServiceIntent.putExtras(intent);
+                context.startService(mediaButtonRouterServiceIntent);
+
+                /* Now event will be handled by the App */
+                if (isOrderedBroadcast()) {
+                    abortBroadcast();
+                }
+            }
+        }
+    }
 }
