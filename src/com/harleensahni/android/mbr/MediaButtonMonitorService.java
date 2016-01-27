@@ -17,6 +17,8 @@ package com.harleensahni.android.mbr;
 
 import static com.harleensahni.android.mbr.Constants.TAG;
 
+import android.app.Activity;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.ComponentName;
 import android.content.ContentResolver;
@@ -24,30 +26,35 @@ import android.content.Context;
 import android.content.Intent;
 import android.database.ContentObserver;
 import android.media.AudioManager;
+import android.media.session.MediaSession;
+import android.media.session.PlaybackState;
 import android.net.Uri;
+import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.IBinder;
 
+import android.os.Looper;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 
 import com.harleensahni.android.mbr.receivers.MediaButtonReceiver;
 
+import java.util.Timer;
+import java.util.TimerTask;
+
 /**
- * Monitors when the media button receiver registered with the audio manager changes, and sets 
+ * Monitors when the media button receiver registered with the audio manager changes, and sets
  * it back to media button router's receiver. Allows media button router to correctly intercept
  * all media button presses.
- * 
+ *
  * @author Peter Haight
  */
- public class MediaButtonMonitorService extends Service {
+public class MediaButtonMonitorService extends Service {
 
     /**
      * Prevents executing thread for more than once
      */
-    public static boolean isRunning = false;
-    private static long reregisterCounter = 0;
-    public SettingsObserver mSettingsObserver;
     public ComponentName mComponentName;
     public AudioManager mAudioManager;
 
@@ -66,15 +73,14 @@ import com.harleensahni.android.mbr.receivers.MediaButtonReceiver;
         Log.d(TAG, "onCreate()");
         _self = this;
         mComponentName = new ComponentName(getPackageName(), MediaButtonReceiver.class.getName());
-        mSettingsObserver = new SettingsObserver(this);
         mAudioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
     }
 
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "onStartCommand(" + intent + ", " + flags + ", " + startId);
-        registerMediaButtonReceiver();
+        registerMultimediaEventReceiver();
 
-        
+
         return START_STICKY;
     }
 
@@ -83,45 +89,13 @@ import com.harleensahni.android.mbr.receivers.MediaButtonReceiver;
         mAudioManager.unregisterMediaButtonEventReceiver(mComponentName);
     }
 
-    public void registerMediaButtonReceiver() {
-        registerMultimediaEventReceiver();
-
-        if (!isRunning) {
-			isRunning = true;
-			Runnable r = new Runnable() {
-
-				@Override
-				public void run() {
-					while (true)
-						try {
-							Thread.sleep(45000);
-
-                            registerMultimediaEventReceiver();
-
-
-                            Log.i(TAG, "reregister! " + (++reregisterCounter));
-
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
-				}
-			};
-			Thread t = new Thread(r);
-			t.start();
-
-			Log.d(TAG, "registerMediaButtonReceiver()");
-		}
-		else {
-
-			Log.d(TAG, "registerMediaButtonReceiver() - not started");
-		}
-
-        //mAudioManager.registerMediaButtonEventReceiver(mComponentName);
-
-
-    }
-    
     public void registerMultimediaEventReceiver() {
+        registerAsReceiver(this);
+    }
+
+    public static int cnt = 0;
+
+    public static void registerAsReceiver(final Context context) {
         /*
          * This registers MultimediaEventReciver to be sole
          * bluetooth multimedia button receiver
@@ -129,52 +103,46 @@ import com.harleensahni.android.mbr.receivers.MediaButtonReceiver;
 
         Log.d(TAG, "Registering Media Button Router to be Multimedia event receiver...");
 
-        AudioManager manager = (AudioManager) getSystemService(AUDIO_SERVICE);
+        AudioManager manager = (AudioManager) context.getSystemService(AUDIO_SERVICE);
         ComponentName cn = new ComponentName(
-                getPackageName(),
+                context.getPackageName(),
                 MediaButtonReceiver.class.getName());
 
         manager.registerMediaButtonEventReceiver(cn);
 
-        Log.d(TAG, "Registering Media Button Router to be Multimedia event receiver finished.");
-    }
 
-    public void registerMultimediaEventReceiventLater() {
-        Thread t = new Thread(new Runnable() {
+        final MediaSession session = new MediaSession(context.getApplicationContext(), "MBR_MS_TAG");
+        session.setCallback(new MediaSession.Callback() {
             @Override
-            public void run() {
-                try {
-                    Thread.sleep(5000);
-                    registerMediaButtonReceiver();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
+            public boolean onMediaButtonEvent(Intent mediaButtonIntent) {
+                Log.i("TAG", "GOT EVENT");
+                new MediaButtonReceiver().onReceive(context.getApplicationContext(), mediaButtonIntent);
+                return true;
             }
         });
 
-        t.start();
+
+
+        int flags = MediaSession.FLAG_HANDLES_MEDIA_BUTTONS | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS;
+
+        session.setFlags(flags); // |
+        //MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS | 1 << 16);
+
+        session.setActive(true);
+
+        PlaybackState state = new PlaybackState.Builder()
+                .setActions(
+                        PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PLAY_PAUSE |
+                                PlaybackState.ACTION_PLAY_FROM_MEDIA_ID | PlaybackState.ACTION_PAUSE |
+                                PlaybackState.ACTION_SKIP_TO_NEXT | PlaybackState.ACTION_SKIP_TO_PREVIOUS)
+                .setState(PlaybackState.STATE_PLAYING, 0, 0, SystemClock.elapsedRealtime())
+                .build();
+
+        session.setPlaybackState(state);
+
+        Log.d(TAG, "Registering Media Button Router to be Multimedia event receiver finished. " + (cnt++));
 
 
     }
 
-    private class SettingsObserver extends ContentObserver {
-        ContentResolver mContentResolver;
-        MediaButtonMonitorService mMonitorService;
-
-        SettingsObserver(MediaButtonMonitorService monitorService) {
-
-            super(new Handler());
-            mMonitorService = monitorService;
-            mContentResolver = mMonitorService.getContentResolver();
-            Uri observedUri = Settings.System.CONTENT_URI;
-            mContentResolver.registerContentObserver(observedUri, false, this);
-        }
-
-        public void onChange(boolean selfChange) {
-            Log.d(TAG, "onChange(" + selfChange + ")");
-
-            mMonitorService.registerMediaButtonReceiver();
-
-        }
-    }
 }

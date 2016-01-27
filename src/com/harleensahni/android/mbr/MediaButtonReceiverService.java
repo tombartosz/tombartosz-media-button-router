@@ -123,8 +123,15 @@ public class MediaButtonReceiverService extends IntentService {
 
         Log.i(TAG, "MediaButtonReceiverService: handling legitimate media key code: " + keyCode);
 
+        boolean isMusicPlaying = checkIsMusicActive();
+
+        List<ResolveInfo> receivers = new ArrayList<>();
+
+        receivers.addAll(Utils.getAllReceivers(context.getPackageManager(), true, false, context));
+        showSelector(context, intent);
+
         //SCENARIO 1: Music is currently playing. 
-        if (checkIsMusicActive()) {
+        if (isMusicPlaying && false) {
 
             String lastMediaButtonReceiverName = Preferences.getLastMediaButtonReceiver();
             if (lastMediaButtonReceiverName == null) {
@@ -182,18 +189,7 @@ public class MediaButtonReceiverService extends IntentService {
             //a music player, we'll assume voice commands.
 
 
-            List<ResolveInfo> receivers = Utils.getAllReceivers(context.getPackageManager(), true, false, context);
-            if (receivers.size() == 1) {
-                // Not using last last_media_button_receiver
-                // since we want this feature to work just as
-                // well on Android version < 4.0
-                ResolveInfo resolveInfo = receivers.get(0);
-                Utils.forwardKeyCodeToComponent(context, new ComponentName(
-                                resolveInfo.activityInfo.packageName, resolveInfo.activityInfo.name), false,
-                        keyCode, null);
-            } else {
-                showSelector(context, intent);
-            }
+
         }
 	}
 	

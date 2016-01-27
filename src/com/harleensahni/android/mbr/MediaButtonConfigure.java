@@ -36,8 +36,6 @@ import android.preference.PreferenceManager;
 import android.speech.tts.TextToSpeech;
 import android.util.Log;
 
-import com.harleensahni.android.mbr.receivers.MediaButtonReceiver;
-
 /**
  * Settings activity for Media Button Router. This is the activity that the user
  * will launch if they pick our app from their app launcher.
@@ -55,10 +53,8 @@ public class MediaButtonConfigure extends PreferenceActivity implements OnShared
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
-        String hiddenReceiverIdsString = PreferenceManager.getDefaultSharedPreferences(this).getString(
-                Constants.HIDDEN_APPS_KEY, "");
-        List<String> hiddenIds = Arrays.asList(hiddenReceiverIdsString.split(","));
+
+        List<String> hiddenIds = getHiddenList();
         final List<String> missingHiddenIds = new ArrayList<String>(hiddenIds);
         
         addPreferencesFromResource(R.xml.preferences);
@@ -68,10 +64,6 @@ public class MediaButtonConfigure extends PreferenceActivity implements OnShared
         PreferenceCategory visibleAppsCategory = new PreferenceCategory(this);
         visibleAppsCategory.setTitle(R.string.visible_apps_header);
         getPreferenceScreen().addPreference(visibleAppsCategory);
-        
-        PreferenceCategory visibleVoiceAppsCategory = new PreferenceCategory(this);
-        visibleVoiceAppsCategory.setTitle(R.string.visible_voice_apps_header);
-        getPreferenceScreen().addPreference(visibleVoiceAppsCategory);
         
         final List<CheckBoxPreference> showAppCheckBoxPreferences = new ArrayList<CheckBoxPreference>();
         OnPreferenceChangeListener showPreferenceChangeListener = new Preference.OnPreferenceChangeListener() {
@@ -111,43 +103,31 @@ public class MediaButtonConfigure extends PreferenceActivity implements OnShared
             }
         };
 
-        List<ResolveInfo> mediaReceivers = Utils.getMediaReceivers(getPackageManager(), false, null);
-        for (ResolveInfo mediaReceiver : mediaReceivers) {
+        List<ResolveInfo> allReceivers = Utils.getAllApps(getPackageManager(), false, null);
+        for (ResolveInfo receiver : allReceivers) {
 //            if (MediaButtonReceiver.class.getName().equals(mediaReceiver.activityInfo.name)) {
 //                continue;
 //            }            
-            String receiverId = Utils.getMediaReceiverUniqueID(mediaReceiver, getPackageManager());
+            String receiverId1 = receiver.activityInfo.name;
+            // Don't think the following is an issue anymore with the latest versions of google play, if it is i'll add back
+//        if (GOOGLE_MUSIC_RECEIVER.contains(receiverId)) {
+//        // i have to be more exact than just application name because
+//        // the two versions (old and new) of google music
+//        // have the same classnames for their intent receivers. I need
+//        // to know where their apks live to be able to differentiate.
+//            receiverId = resolveInfo.activityInfo.applicationInfo.sourceDir + receiverId;
+//        }
+            String receiverId = receiverId1;
             CheckBoxPreference showReceiverPreference = new CheckBoxPreference(this);
-            showReceiverPreference.setTitle(Utils.getAppName(mediaReceiver, getPackageManager()));
+            showReceiverPreference.setTitle(Utils.getAppName(receiver, getPackageManager()));
             showReceiverPreference.setPersistent(false);
             showReceiverPreference.setKey(receiverId);
-            showReceiverPreference.setChecked(!hiddenIds.contains(showReceiverPreference.getKey()));
+            showReceiverPreference.setChecked(!hiddenIds.isEmpty() && !hiddenIds.contains(showReceiverPreference.getKey()));
             showReceiverPreference.setOnPreferenceChangeListener(showPreferenceChangeListener);
             visibleAppsCategory.addPreference(showReceiverPreference);
             showAppCheckBoxPreferences.add(showReceiverPreference);
             
             missingHiddenIds.remove(receiverId);
-        }
-        
-        List<ResolveInfo> voiceCommandApps = Utils.getVoiceCommandApps(getPackageManager(), false, null);
-        for (ResolveInfo currVoiceCommandApp : voiceCommandApps) {
-			if (ReceiverSelectorLocked.class.getName().equals(
-					currVoiceCommandApp.activityInfo.name)) {
-				continue;
-			}
-			if (ReceiverSelector.class.getName().equals(
-					currVoiceCommandApp.activityInfo.name)) {
-				continue;
-			}
-        	String receiverId = Utils.getMediaReceiverUniqueID(currVoiceCommandApp, getPackageManager());
-            CheckBoxPreference showVoiceCommandAppPreference = new CheckBoxPreference(this);
-            showVoiceCommandAppPreference.setTitle(Utils.getAppName(currVoiceCommandApp, getPackageManager()));
-            showVoiceCommandAppPreference.setPersistent(false);
-            showVoiceCommandAppPreference.setKey(receiverId);
-            showVoiceCommandAppPreference.setChecked(!hiddenIds.contains(showVoiceCommandAppPreference.getKey()));
-            showVoiceCommandAppPreference.setOnPreferenceChangeListener(showPreferenceChangeListener);
-            visibleVoiceAppsCategory.addPreference(showVoiceCommandAppPreference);
-            showAppCheckBoxPreferences.add(showVoiceCommandAppPreference);
         }
 
         Eula.show(this);
@@ -178,6 +158,24 @@ public class MediaButtonConfigure extends PreferenceActivity implements OnShared
                 startService(intent);
             }
         }
+    }
+
+    /**
+     * Takes preference for hidden apps and creates list of packages
+     * @return
+     */
+    private List<String> getHiddenList() {
+        String hiddenReceiverIdsString = PreferenceManager.getDefaultSharedPreferences(this).getString(
+                Constants.HIDDEN_APPS_KEY, "");
+        String [] splitted = hiddenReceiverIdsString.split(",");
+
+        List<String> ret = new ArrayList<>();
+        for (String item : splitted ) {
+            if (!item.trim().isEmpty()) {
+                ret.add(item);
+            }
+        }
+        return ret;
     }
 
     @Override

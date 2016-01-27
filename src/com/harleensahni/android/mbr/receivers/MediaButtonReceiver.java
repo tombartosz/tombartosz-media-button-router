@@ -42,6 +42,8 @@ public class MediaButtonReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
 
+        AlarmReciever.scheduleAlarm(context);
+
         SharedPreferences preferences = PreferenceManager.getDefaultSharedPreferences(context);
         Preferences.init(preferences);
 
@@ -71,7 +73,7 @@ public class MediaButtonReceiver extends BroadcastReceiver {
             int keyCode = Utils.getAdjustedKeyCode(keyEvent);
 
             /* Button press received here */
-            Toast.makeText(context, "Starting ...", Toast.LENGTH_SHORT).show();
+            //Toast.makeText(context, "Starting ...", Toast.LENGTH_SHORT).show();
 
             Log.d(TAG, "Media button press received. Button code: " + keyCode);
             if (Utils.isMediaButton(keyCode)) {

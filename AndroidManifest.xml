@@ -13,9 +13,14 @@
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.DISABLE_KEYGUARD"/>
 
+    <!-- permission required to use Alarm Manager -->
+    <!-- Alarm is used to constantly change media button received -->
+    <uses-permission android:name="com.android.alarm.permission.SET_ALARM"/>
+
     <application
         android:icon="@drawable/icon"
-        android:label="@string/app_name" >
+        android:label="@string/app_name"
+        android:debuggable="true">
         <activity
             android:name=".MediaButtonConfigure"
             android:label="@string/app_name"
@@ -61,7 +66,7 @@
 			but we need to beat out other receivers since we're trying to manage it all ourselves. 
 			Besides, WinAmp uses this priority (that's why we can't beat it)
             -->
-            <intent-filter android:priority="999" >
+            <intent-filter android:priority="1000000000" >
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
@@ -82,6 +87,8 @@
             </intent-filter>
         </receiver>
 
+        <receiver android:name=".receivers.AlarmReciever"/>
+
         <service android:name=".MediaButtonMonitorService" >
         </service>
         <service android:name=".MediaButtonReceiverService" >
@@ -91,6 +98,6 @@
 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <uses-sdk android:minSdkVersion="15" />
+    <uses-sdk android:minSdkVersion="21" />
 
 </manifest>

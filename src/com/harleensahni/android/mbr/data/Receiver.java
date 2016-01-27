@@ -18,8 +18,7 @@ public abstract class Receiver {
 	public abstract void onSelect(int position);
 
 	public void beforeSelect() {
-				/* Re register media button event */
-		MediaButtonMonitorService.getService().registerMultimediaEventReceiventLater();
+			/* Re register media button event */
 	}
 
 	public int getPosition() {
